@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f141b">
+<title>Atlas Assistant</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Atlas Assistant","short_name":"Atlas","display":"standalone","start_url":".","background_color":"#0f141b","theme_color":"#0f141b"}'>
+<style>
+:root{--bg:#0f141b;--panel:#171e28;--line:#273140;--text:#e8edf4;--mute:#8a97a8;--accent:#7aa2ff;--accent-ink:#0b1220;--user:#1d2a44;--code:#0a0e14;color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#f6f8fb;--panel:#fff;--line:#dbe2ec;--text:#18212e;--mute:#5d6b7e;--accent:#2f5fe0;--accent-ink:#fff;--user:#e4ecfd;--code:#eef2f8;color-scheme:light}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+header{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+header h1{font-size:17px;margin:0;flex:1;font-weight:650;letter-spacing:.2px}
+.ic{width:40px;height:40px;border-radius:10px;font-size:20px;display:grid;place-items:center;color:var(--text)}
+.ic:active{background:var(--panel)}
+.ic.on{background:var(--accent);color:var(--accent-ink)}
+.modes{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.modes button{flex:1;padding:8px 6px;border-radius:999px;border:1px solid var(--line);color:var(--mute);font-size:14px}
+.modes button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+#log{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:92%;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--user);padding:9px 13px;border-radius:16px 16px 4px 16px;white-space:pre-wrap}
+.msg.ai{align-self:flex-start}
+.msg p{margin:0 0 .6em}.msg h3,.msg h4{margin:.8em 0 .3em}.msg ul,.msg ol{margin:.3em 0 .7em;padding-left:1.3em}
+.msg a{color:var(--accent)}
+.msg code{background:var(--code);padding:1px 5px;border-radius:5px;font:13.5px ui-monospace,Menlo,Consolas,monospace}
+.cb{background:var(--code);border:1px solid var(--line);border-radius:10px;margin:.5em 0;overflow:hidden}
+.cb .bar{display:flex;gap:4px;align-items:center;padding:4px 8px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--mute)}
+.cb .bar span{flex:1}.cb .bar button{padding:4px 9px;border-radius:7px;border:1px solid var(--line);color:var(--text)}
+.cb .bar button.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.cb pre{margin:0;padding:10px 12px;overflow-x:auto;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.src{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.src a{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;text-decoration:none;color:var(--mute);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tools{margin-top:2px}.tools button{font-size:13px;color:var(--mute);padding:4px 8px}
+.empty{margin:auto;text-align:center;color:var(--mute);max-width:300px}
+.empty b{display:block;color:var(--text);font-size:19px;margin-bottom:6px}
+.chips{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.chips button{border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;color:var(--text);background:var(--panel)}
+.dots{display:inline-flex;gap:4px}.dots i{width:7px;height:7px;border-radius:50%;background:var(--mute);animation:b 1s infinite}.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes b{50%{transform:translateY(-4px);opacity:.4}}
+@media (prefers-reduced-motion:reduce){.dots i{animation:none}}
+form{display:flex;gap:8px;align-items:flex-end;padding:8px 10px;border-top:1px solid var(--line)}
+textarea{flex:1;resize:none;max-height:140px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font:inherit;outline:none}
+textarea:focus,input:focus{border-color:var(--accent)}
+.send{background:var(--accent);color:var(--accent-ink);width:44px;height:44px;border-radius:50%;font-size:20px;font-weight:700}
+.mic{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);font-size:19px}
+.mic.rec{background:#e5484d;border-color:#e5484d;color:#fff}
+#drawer,#settings{position:fixed;inset:0;display:none;z-index:20}
+#drawer.open,#settings.open{display:flex}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.sheet{position:relative;background:var(--bg);width:min(86%,340px);height:100%;padding:calc(12px + env(safe-area-inset-top,0px)) 12px 12px;overflow-y:auto;border-right:1px solid var(--line)}
+.sheet h2{font-size:16px;margin:4px 0 12px}
+.new{width:100%;background:var(--accent);color:var(--accent-ink);padding:10px;border-radius:10px;font-weight:600;margin-bottom:10px}
+.row{display:flex;align-items:center;border-radius:10px}.row:active,.row.on{background:var(--panel)}
+.row button.t{flex:1;text-align:left;padding:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row button.d{padding:8px 10px;color:var(--mute)}
+#settings{justify-content:center;align-items:center}
+#settings .sheet{height:auto;border:1px solid var(--line);border-radius:16px;width:min(92%,420px);padding:16px}
+label{display:block;font-size:13.5px;color:var(--mute);margin:12px 0 4px}
+input{width:100%;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;outline:none}
+.hint{font-size:12.5px;color:var(--mute);margin-top:6px}.hint a{color:var(--accent)}
+.btns{display:flex;gap:8px;margin-top:16px}.btns button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line)}.btns .pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+#prev{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:30;padding-top:env(safe-area-inset-top,0px)}
+#prev.open{display:flex}#prev header h1{font-size:15px}
+#prev iframe{flex:1;border:0;background:#fff}
+#tray{display:none;gap:6px;flex-wrap:wrap;padding:6px 10px 0}#tray button{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:13px;background:var(--panel)}
+select{width:100%;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;margin-bottom:8px}
+.pb{display:flex;gap:8px;margin-bottom:8px}.pb button{flex:1;padding:8px;border:1px solid var(--line);border-radius:10px;font-size:14px}
+.mic{flex:none}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:14px;display:none;z-index:50}
+</style>
+</head>
+<body>
+<header>
+  <button class="ic" id="menu" aria-label="History">☰</button>
+  <h1 id="title">Atlas</h1>
+  <button class="ic" id="spk" aria-label="Read replies aloud">🔊</button>
+  <button class="ic" id="gear" aria-label="Settings">⚙</button>
+</header>
+<div class="modes" id="modes">
+  <button data-m="chat">Chat</button><button data-m="code">Build</button><button data-m="research">Research</button>
+</div>
+<main id="log" aria-live="polite"></main>
+<div id="tray"></div>
+<form id="f">
+  <button type="button" class="mic" id="attb" aria-label="Attach file">📎</button><input type="file" id="att" multiple hidden accept="image/*,application/pdf,.txt,.md,.csv,.json,.js,.ts,.py,.html,.css,.java,.c,.cpp,.xml,.yml,.yaml"><button type="button" class="mic" id="mic" aria-label="Voice input">🎤</button>
+  <textarea id="in" rows="1" placeholder="Message Atlas"></textarea>
+  <button class="send" id="go" aria-label="Send">↑</button>
+</form>
+
+<div id="drawer"><div class="sheet"><h2>History</h2><select id="proj" aria-label="Project"></select><div class="pb"><button id="np">+ Project</button><button id="ep">Edit</button></div><button class="new" id="new">New chat</button><div id="list"></div></div><div class="scrim" id="dscrim"></div></div>
+
+<div id="settings"><div class="scrim" id="sscrim"></div><div class="sheet">
+  <h2>Settings</h2>
+  <label for="key">Gemini API key</label>
+  <input id="key" type="password" autocomplete="off" placeholder="Paste your key">
+  <div class="hint">Free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. It stays on this device and is sent only to Google.</div>
+  <label for="model">Model</label>
+  <input id="model" placeholder="gemini-2.5-flash">
+  <div class="hint">If a model name stops working, copy a current one from AI Studio.</div>
+  <div class="btns"><button id="clear">Delete all chats</button><button class="pri" id="save">Save</button></div>
+</div></div>
+
+<div id="prev"><header><button class="ic" id="pclose" aria-label="Close preview">✕</button><h1>Live preview</h1></header><iframe id="pf" sandbox="allow-scripts allow-forms allow-modals"></iframe></div>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const SYS={
+ chat:"You are Atlas, a warm, sharp assistant. Answer clearly and concisely. Use Markdown. For code use fenced blocks with a language tag.",
+ code:"You are Atlas, an expert software engineer. When the user describes an app, game, or page, reply with one short sentence, then ONE complete, self-contained HTML file (inline CSS and JS, mobile-first, no external dependencies) in a single ```html block so it can be previewed live. When they ask for changes, return the full updated file. For non-web requests, give clean, commented code and brief explanations.",
+ research:"You are Atlas, a careful research analyst. Use web search for current facts. Give a direct answer first, then key findings as short bullets, then caveats or disagreements between sources. Never invent facts or sources; say when something is uncertain."
+};
+const HINTS={
+ chat:["Explain how vaccines train the immune system","Help me write a polite email asking for a deadline extension"],
+ code:["Build a to-do app with dark mode that saves my tasks","Make a simple snake game I can play with swipes"],
+ research:["What are the latest developments in solid-state batteries?","Compare the pros and cons of heat pumps vs gas furnaces"]
+};
+let S;
+try{S=JSON.parse(localStorage.getItem("atlas")||"null")}catch(e){S=null}
+S=S||{key:"",model:"gemini-2.5-flash",speak:false,mode:"chat",cur:null,chats:[],projects:[],pid:null};S.projects=S.projects||[];
+const save=()=>{try{localStorage.setItem("atlas",JSON.stringify(S,(k,v)=>k==="data"?undefined:v))}catch(e){toast("Storage is full or blocked")}};
+const cur=()=>S.chats.find(c=>c.id===S.cur);
+let busy=false;
+
+function toast(t){const e=$("#toast");e.textContent=t;e.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display="none",2200)}
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* ---------- Markdown ---------- */
+const codes=[];
+function md(src){
+  codes.length=0;
+  let t=src.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,l,c)=>{codes.push({l:l||"code",c:c.replace(/\n$/,"")});return "\u0000"+(codes.length-1)+"\u0000"});
+  t=esc(t);
+  const inl=s=>s.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>").replace(/(^|[\s(])\*([^*\n]+)\*/g,"$1<i>$2</i>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out=[];let list=null;
+  const close=()=>{if(list){out.push("</"+list+">");list=null}};
+  for(const ln of t.split("\n")){
+    let m;
+    if(m=ln.match(/^\u0000(\d+)\u0000$/)){close();out.push(m[0]);continue}
+    if(m=ln.match(/^#{1,4}\s+(.*)/)){close();out.push("<h3>"+inl(m[1])+"</h3>");continue}
+    if(m=ln.match(/^\s*[-*•]\s+(.*)/)){if(list!=="ul"){close();out.push("<ul>");list="ul"}out.push("<li>"+inl(m[1])+"</li>");continue}
+    if(m=ln.match(/^\s*\d+[.)]\s+(.*)/)){if(list!=="ol"){close();out.push("<ol>");list="ol"}out.push("<li>"+inl(m[1])+"</li>");continue}
+    close();
+    if(ln.trim())out.push("<p>"+inl(ln)+"</p>");
+  }
+  close();
+  return out.join("").replace(/\u0000(\d+)\u0000/g,(m,i)=>{
+    const c=codes[i],prev=/^(html|htm|svg)$/i.test(c.l);
+    return '<div class="cb" data-i="'+i+'"><div class="bar"><span>'+esc(c.l)+'</span>'+(prev?'<button class="go" data-a="run">Preview</button>':'')+'<button data-a="copy">Copy</button><button data-a="dl">Save</button></div><pre>'+esc(c.c)+'</pre></div>';
+  });
+}
+
+/* ---------- Rendering ---------- */
+function render(){
+  const c=cur(),log=$("#log");
+  const pr=S.projects.find(x=>x.id===S.pid);$("#title").textContent=c&&c.title?c.title:(pr?pr.name:"Atlas");
+  document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on",b.dataset.m===S.mode));
+  $("#spk").classList.toggle("on",S.speak);
+  log.innerHTML="";
+  if(!c||!c.msgs.length){
+    const e=document.createElement("div");e.className="empty";
+    e.innerHTML="<b>What shall we work on?</b>Chat, build an app, or research a topic. Tap the mic to talk.<div class='chips'></div>";
+    HINTS[S.mode].forEach(h=>{const b=document.createElement("button");b.textContent=h;b.onclick=()=>send(h);e.querySelector(".chips").appendChild(b)});
+    log.appendChild(e);
+    if(!S.key){toast("Add your Gemini key in settings ⚙")}
+    return;
+  }
+  c.msgs.forEach((m,i)=>log.appendChild(bubble(m,i)));
+  log.scrollTop=log.scrollHeight;
+}
+function bubble(m,i){
+  const d=document.createElement("div");d.className="msg "+(m.role==="user"?"user":"ai");
+  if(m.role==="user"){d.textContent=(m.shown!==undefined?m.shown:m.text)+(m.names&&m.names.length?"\n📎 "+m.names.join(", "):"");return d}
+  d.dataset.i=i;
+  d.innerHTML=md(m.text);
+  d._codes=codes.slice();
+  if(m.sources&&m.sources.length){
+    const s=document.createElement("div");s.className="src";
+    m.sources.forEach(x=>{const a=document.createElement("a");a.href=x.uri;a.target="_blank";a.rel="noopener";a.textContent=x.title||x.uri;s.appendChild(a)});
+    d.appendChild(s);
+  }
+  const t=document.createElement("div");t.className="tools";
+  t.innerHTML='<button data-a="say">🔊 Listen</button><button data-a="cp">Copy reply</button>';
+  d.appendChild(t);
+  return d;
+}
+$("#log").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-a]");if(!b)return;
+  const a=b.dataset.a,msg=b.closest(".msg");
+  if(a==="say")return say(cur().msgs[msg.dataset.i].text,true);
+  if(a==="cp")return copy(cur().msgs[msg.dataset.i].text);
+  const code=msg._codes[b.closest(".cb").dataset.i].c;
+  if(a==="copy")copy(code);
+  if(a==="dl"){const l=msg._codes[b.closest(".cb").dataset.i].l.toLowerCase(),x=({javascript:"js",js:"js",python:"py",py:"py",html:"html",css:"css",json:"json",typescript:"ts",ts:"ts",java:"java",svg:"svg"})[l]||"txt";const u=URL.createObjectURL(new Blob([code],{type:"text/plain"})),a2=document.createElement("a");a2.href=u;a2.download="atlas-code."+x;a2.click();setTimeout(()=>URL.revokeObjectURL(u),2000);toast("Saved to downloads")}
+  if(a==="run"){$("#pf").srcdoc=code;$("#prev").classList.add("open")}
+});
+function copy(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("Copied")).catch(()=>toast("Copy failed"))}
+
+/* ---------- Gemini (streaming) ---------- */
+let ctrl=null,pending=[];
+const projOf=c=>S.projects.find(p=>p.id===c.pid);
+function setBusy(v){busy=v;$("#go").textContent=v?"■":"↑";$("#go").setAttribute("aria-label",v?"Stop":"Send")}
+async function ask(c,onChunk){
+  const p=projOf(c);
+  const body={
+    systemInstruction:{parts:[{text:SYS[c.mode]+(p&&p.instr?"\n\nProject instructions (follow these):\n"+p.instr:"")}]},
+    contents:c.msgs.map(m=>({role:m.role==="user"?"user":"model",parts:[{text:m.text}].concat((m.files||[]).filter(f=>f.data).map(f=>({inlineData:{mimeType:f.mime,data:f.data}})))})),
+    generationConfig:{maxOutputTokens:8192}
+  };
+  if(c.mode==="research")body.tools=[{google_search:{}}];
+  const url="https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(S.model||"gemini-2.5-flash")+":streamGenerateContent?alt=sse";
+  ctrl=new AbortController();
+  const r=await fetch(url,{method:"POST",signal:ctrl.signal,headers:{"Content-Type":"application/json","x-goog-api-key":S.key},body:JSON.stringify(body)});
+  if(!r.ok){
+    const j=await r.json().catch(()=>({}));
+    const m=(j.error&&j.error.message)||("Error "+r.status);
+    if(r.status===429)throw new Error("Free limit reached. Wait a minute and try again.");
+    if(r.status===400&&/API key/i.test(m))throw new Error("Your API key looks invalid. Check it in settings.");
+    if(r.status===404)throw new Error("That model name was not found. Change it in settings.");
+    throw new Error(m);
+  }
+  const rd=r.body.getReader(),dec=new TextDecoder(),seen=new Set(),sources=[];
+  let buf="",text="",block="";
+  for(;;){
+    const {done,value}=await rd.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let i;
+    while((i=buf.indexOf("\n"))>=0){
+      const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+      if(line.indexOf("data:")!==0)continue;
+      let j;try{j=JSON.parse(line.slice(5))}catch(e){continue}
+      if(j.promptFeedback&&j.promptFeedback.blockReason)block=j.promptFeedback.blockReason;
+      const cand=j.candidates&&j.candidates[0];if(!cand)continue;
+      if(cand.content&&cand.content.parts){text+=cand.content.parts.map(x=>x.text||"").join("");onChunk(text)}
+      ((cand.groundingMetadata&&cand.groundingMetadata.groundingChunks)||[]).forEach(g=>{if(g.web&&!seen.has(g.web.uri)){seen.add(g.web.uri);sources.push(g.web)}});
+    }
+  }
+  ctrl=null;
+  if(!text)throw new Error(block?"The request was blocked: "+block:"The model returned no text. Try rephrasing.");
+  return {text,sources};
+}
+async function send(text){
+  text=(text||"").trim();
+  if((!text&&!pending.length)||busy)return;
+  if(!S.key){toast("Add your Gemini key first");openSettings();return}
+  let c=cur();
+  if(!c){c={id:Date.now()+"",title:"",mode:S.mode,pid:S.pid,msgs:[]};S.chats.unshift(c);S.cur=c.id}
+  c.mode=S.mode;
+  if(!c.title)c.title=(text||pending[0].name).slice(0,40);
+  const files=pending;pending=[];tray();
+  let full=text;
+  files.filter(f=>f.text!=null).forEach(f=>{full+="\n\n[File: "+f.name+"]\n```\n"+f.text+"\n```"});
+  c.msgs.push({role:"user",text:full||"(see attachment)",shown:text,names:files.map(f=>f.name),files:files.filter(f=>f.data)});
+  setBusy(true);$("#in").value="";fit();render();
+  const log=$("#log"),live=document.createElement("div");
+  live.className="msg ai";live.innerHTML='<span class="dots"><i></i><i></i><i></i></span>';
+  log.appendChild(live);log.scrollTop=1e9;
+  let partial="",raf=0;
+  const paint=()=>{raf=0;const near=log.scrollHeight-log.scrollTop-log.clientHeight<140;let t=partial;if((t.match(/```/g)||[]).length%2)t+="\n```";live.innerHTML=md(t);live._codes=codes.slice();if(near)log.scrollTop=1e9};
+  try{
+    const r=await ask(c,t=>{partial=t;if(!raf)raf=requestAnimationFrame(paint)});
+    c.msgs.push({role:"ai",text:r.text,sources:r.sources});
+    save();setBusy(false);render();if(S.speak)say(r.text);
+  }catch(err){
+    cancelAnimationFrame(raf);
+    if(err.name==="AbortError"&&partial){c.msgs.push({role:"ai",text:partial+"\n\n*(stopped)*"});save();setBusy(false);render();return}
+    c.msgs.pop();save();setBusy(false);render();
+    $("#in").value=text;pending=files;tray();
+    if(err.name!=="AbortError"){const e=document.createElement("div");e.className="msg ai";e.textContent="⚠ "+(err.message||"Network error. Check your connection.");log.appendChild(e);log.scrollTop=1e9}
+  }
+}
+
+/* ---------- Attachments ---------- */
+function tray(){
+  const t=$("#tray");t.innerHTML="";
+  pending.forEach((p,i)=>{const b=document.createElement("button");b.type="button";b.textContent=p.name+" ✕";b.onclick=()=>{pending.splice(i,1);tray()};t.appendChild(b)});
+  t.style.display=pending.length?"flex":"none";
+}
+$("#attb").onclick=()=>$("#att").click();
+$("#att").onchange=async e=>{
+  for(const f of e.target.files){
+    if(f.size>8e6){toast(f.name+" is over 8 MB");continue}
+    if(/^(image\/|application\/pdf)/.test(f.type)){
+      const data=await new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result.split(",")[1]);x.readAsDataURL(f)});
+      pending.push({name:f.name,mime:f.type,data});
+    }else pending.push({name:f.name,text:(await f.text()).slice(0,100000)});
+  }
+  e.target.value="";tray();
+};
+
+/* ---------- Voice ---------- */
+function say(t,force){
+  if(!("speechSynthesis" in window))return toast("Speech is not supported here");
+  speechSynthesis.cancel();
+  if(!force&&!S.speak)return;
+  const clean=t.replace(/```[\s\S]*?```/g," code block omitted. ").replace(/[*#`_>]/g,"").replace(/\[([^\]]+)\]\([^)]+\)/g,"$1");
+  const u=new SpeechSynthesisUtterance(clean);u.rate=1.02;speechSynthesis.speak(u);
+}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null;
+$("#mic").onclick=()=>{
+  if(!SR)return toast("Voice input is not supported in this browser. Use Chrome.");
+  if(rec){rec.stop();return}
+  speechSynthesis&&speechSynthesis.cancel();
+  rec=new SR();rec.lang=navigator.language||"en-US";rec.interimResults=true;
+  let final="";
+  rec.onstart=()=>$("#mic").classList.add("rec");
+  rec.onresult=e=>{let s="";for(const r of e.results){s+=r[0].transcript;if(r.isFinal)final=s}$("#in").value=s;fit()};
+  rec.onerror=e=>toast(e.error==="not-allowed"?"Allow microphone access to talk":"Voice error: "+e.error);
+  rec.onend=()=>{$("#mic").classList.remove("rec");rec=null;const v=$("#in").value.trim();if(v)send(v)};
+  rec.start();
+};
+
+/* ---------- UI wiring ---------- */
+const fit=()=>{const t=$("#in");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,140)+"px"};
+$("#in").addEventListener("input",fit);
+$("#f").addEventListener("submit",e=>{e.preventDefault();if(busy){ctrl&&ctrl.abort();return}send($("#in").value)});
+$("#modes").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.mode=b.dataset.m;save();render()});
+$("#spk").onclick=()=>{S.speak=!S.speak;if(!S.speak)speechSynthesis.cancel();save();render();toast(S.speak?"Replies will be read aloud":"Read aloud off")};
+function drawer(){
+  const sel=$("#proj");
+  sel.innerHTML='<option value="">Everyday chats</option>'+S.projects.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join("");
+  sel.value=S.pid||"";
+  const l=$("#list");l.innerHTML="";
+  const shown=S.chats.filter(c=>(c.pid||null)===S.pid);
+  if(!shown.length)l.innerHTML='<div class="hint">No chats here yet.</div>';
+  shown.forEach(c=>{
+    const r=document.createElement("div");r.className="row"+(c.id===S.cur?" on":"");
+    r.innerHTML='<button class="t"></button><button class="d" aria-label="Delete chat">✕</button>';
+    r.querySelector(".t").textContent=c.title||"New chat";
+    r.querySelector(".t").onclick=()=>{S.cur=c.id;S.mode=c.mode;save();$("#drawer").classList.remove("open");render()};
+    r.querySelector(".d").onclick=()=>{S.chats=S.chats.filter(x=>x.id!==c.id);if(S.cur===c.id)S.cur=null;save();drawer();render()};
+    l.appendChild(r);
+  });
+}
+$("#proj").onchange=e=>{S.pid=e.target.value||null;S.cur=null;save();drawer();render()};
+$("#np").onclick=()=>{
+  const n=prompt("Project name");if(!n||!n.trim())return;
+  const ins=prompt("Instructions Atlas should always follow in this project (optional)")||"";
+  const p={id:Date.now()+"",name:n.trim(),instr:ins};S.projects.push(p);S.pid=p.id;S.cur=null;save();drawer();render();
+};
+$("#ep").onclick=()=>{
+  const p=S.projects.find(x=>x.id===S.pid);if(!p)return toast("Pick a project first");
+  const n=prompt("Project name (clear it to delete the project)",p.name);if(n===null)return;
+  if(!n.trim()){S.projects=S.projects.filter(x=>x!==p);S.chats.forEach(c=>{if(c.pid===p.id)c.pid=null});S.pid=null;S.cur=null}
+  else{p.name=n.trim();const i=prompt("Instructions for this project",p.instr||"");if(i!==null)p.instr=i}
+  save();drawer();render();
+};
+$("#menu").onclick=()=>{drawer();$("#drawer").classList.add("open")};
+$("#dscrim").onclick=()=>$("#drawer").classList.remove("open");
+$("#new").onclick=()=>{S.cur=null;save();$("#drawer").classList.remove("open");render()};
+function openSettings(){$("#key").value=S.key;$("#model").value=S.model;$("#settings").classList.add("open")}
+$("#gear").onclick=openSettings;
+$("#sscrim").onclick=()=>$("#settings").classList.remove("open");
+$("#save").onclick=()=>{S.key=$("#key").value.trim();S.model=$("#model").value.trim()||"gemini-2.5-flash";save();$("#settings").classList.remove("open");toast("Saved");render()};
+$("#clear").onclick=()=>{if(confirm("Delete all chats on this device?")){S.chats=[];S.cur=null;save();$("#settings").classList.remove("open");render()}};
+$("#pclose").onclick=()=>{$("#prev").classList.remove("open");$("#pf").srcdoc=""};
+render();
+</script>
+</body>
+</html>
